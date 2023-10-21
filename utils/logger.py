@@ -45,4 +45,16 @@ class JsonLogger:
         }
         
         with open(self.log_file, 'a') as f:
-            f.write(json.dumps(log_entry) + '\n')
+            f.write(json.dumps(log_entry, ensure_ascii=False) + '\n')
+    
+    def info(self, message, **kwargs):
+        """Log an info message."""
+        self.log('INFO', message, **kwargs)
+    
+    def warning(self, message, **kwargs):
+        """Log a warning message."""
+        self.log('WARNING', message, **kwargs)
+    
+    def error(self, message, **kwargs):
+        """Log an error message."""
+        self.log('ERROR', message, **kwargs)
