@@ -1,0 +1,33 @@
+[project]
+name = "agent-ops-backend"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.29",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.29",
+    "psycopg2-binary>=2.9",
+    "alembic>=1.13",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.2",
+    "python-multipart>=0.0.9",
+    "httpx>=0.27",
+    "redis>=5.0",
+    "arq>=0.26",
+    "passlib[bcrypt]>=1.7",
+    "python-jose[cryptography]>=3.3",
+    "slowapi>=0.1.9",
+    "pyyaml>=6.0",
+    "agent-ops-sdk",
+]
+
+[tool.uv.sources]
+agent-ops-sdk = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

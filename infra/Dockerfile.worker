@@ -1,0 +1,12 @@
+FROM python:3.11-slim
+WORKDIR /app
+RUN pip install uv
+COPY pyproject.toml worker/pyproject.toml backend/pyproject.toml packages/agent-ops-sdk/pyproject.toml packages/agent-ops-cli/pyproject.toml ./
+COPY worker/ ./worker/
+COPY backend/ ./backend/
+COPY packages/ ./packages/
+COPY evals/ ./evals/
+COPY security/ ./security/
+COPY benchmarks/ ./benchmarks/
+RUN pip install -e ./packages/agent-ops-sdk -e ./packages/agent-ops-cli -e ./backend -e ./worker
+CMD ["python", "-m", "worker.main"]

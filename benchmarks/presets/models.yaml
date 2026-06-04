@@ -1,0 +1,35 @@
+domestic:
+  - provider: qwen
+    model: qwen-plus
+  - provider: qwen
+    model: qwen-turbo
+  - provider: deepseek
+    model: deepseek-chat
+  - provider: zhipu
+    model: glm-4
+
+international:
+  - provider: openai
+    model: gpt-4o
+  - provider: openai
+    model: gpt-4o-mini
+  - provider: anthropic
+    model: claude-sonnet-4-20250514
+
+sota:
+  - provider: openai
+    model: gpt-4o
+  - provider: anthropic
+    model: claude-sonnet-4-20250514
+  - provider: qwen
+    model: qwen-max
+  - provider: deepseek
+    model: deepseek-reasoner
+
+cost_efficient:
+  - provider: openai
+    model: gpt-4o-mini
+  - provider: qwen
+    model: qwen-turbo
+  - provider: deepseek
+    model: deepseek-chat

@@ -1,0 +1,22 @@
+project: demo-agent
+framework: langchain
+entrypoint: app.agent:graph
+invoke:
+  method: invoke
+  input_key: messages
+  input_format: chat
+env_file: .env
+eval:
+  datasets: ./evals/
+  suites: [smoke, regression, security]
+models:
+  swap_hook: app.agent:set_llm
+  candidates:
+    - provider: openai
+      model: gpt-4o-mini
+    - provider: qwen
+      model: qwen-turbo
+    - provider: deepseek
+      model: deepseek-chat
+security:
+  policies: ./security/policies.yaml

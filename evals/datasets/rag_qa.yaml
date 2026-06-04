@@ -1,0 +1,10 @@
+name: rag_qa_v1
+items:
+  - input: "什么是 AgentOps?"
+    expected_output: "智能体运维"
+    metadata:
+      category: definition
+  - input: "AgentOps 有哪些核心能力?"
+    expected_behavior: respond
+    metadata:
+      category: capabilities

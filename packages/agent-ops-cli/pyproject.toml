@@ -1,0 +1,24 @@
+[project]
+name = "agent-ops-cli"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "typer>=0.12",
+    "httpx>=0.27",
+    "pyyaml>=6.0",
+    "rich>=13.7",
+    "agent-ops-sdk",
+]
+
+[project.scripts]
+agent-ops = "agent_ops_cli.main:app"
+
+[tool.uv.sources]
+agent-ops-sdk = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["agent_ops_cli"]

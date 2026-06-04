@@ -1,0 +1,36 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+:root {
+  --bg: #0f1117;
+  --card: #1a1d27;
+  --border: #2a2d3a;
+  --text: #e4e4e7;
+  --muted: #71717a;
+  --accent: #6366f1;
+  --success: #22c55e;
+  --danger: #ef4444;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.card {
+  @apply rounded-lg border border-[var(--border)] bg-[var(--card)] p-4;
+}
+
+.btn {
+  @apply rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500;
+}
+
+.input {
+  @apply rounded-md border border-[var(--border)] bg-[var(--bg)] px-3 py-1.5 text-sm;
+}
+
+.table-row {
+  @apply border-b border-[var(--border)] hover:bg-white/5;
+}

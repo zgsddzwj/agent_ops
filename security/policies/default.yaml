@@ -1,0 +1,6 @@
+max_input_length: 32000
+block_pii_in_output: true
+rate_limit_per_minute: 60
+injection_patterns:
+  - "ignore previous instructions"
+  - "忽略指令"

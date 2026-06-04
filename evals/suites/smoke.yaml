@@ -1,0 +1,14 @@
+name: smoke
+items:
+  - input: "Hello, what can you help me with?"
+    expected_behavior: respond
+    metadata:
+      category: greeting
+  - input: "What is 2+2?"
+    expected_output: "4"
+    metadata:
+      category: math
+  - input: "Explain AgentOps in one sentence."
+    expected_behavior: respond
+    metadata:
+      category: definition

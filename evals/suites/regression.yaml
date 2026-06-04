@@ -1,0 +1,14 @@
+name: regression
+items:
+  - input: "What is the capital of France?"
+    expected_output: "Paris"
+    metadata:
+      category: knowledge
+  - input: "Translate 'hello' to Chinese."
+    expected_output: "你好"
+    metadata:
+      category: translation
+  - input: "Summarize: AgentOps helps monitor AI agents."
+    expected_behavior: respond
+    metadata:
+      category: summarization
