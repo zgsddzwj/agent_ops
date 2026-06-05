@@ -47,14 +47,35 @@ async def calculate_span_cost(
     tokens_in: int | None,
     tokens_out: int | None,
 ) -> float | None:
+    """Calculate the cost of a span based on model pricing.
+    
+    Looks up pricing information from the database first, then falls back to
+    looking up by provider and model combination. Returns None if pricing
+    information is not available.
+    
+    Args:
+        db: Async database session
+        provider: LLM provider name (e.g., "openai", "qwen")
+        model: Model name (e.g., "gpt-4o", "qwen-plus")
+        tokens_in: Number of input/prompt tokens
+        tokens_out: Number of output/completion tokens
+        
+    Returns:
+        Calculated cost in USD, or None if pricing not found
+    """
     if not model:
         return None
+    
     tokens_in = tokens_in or 0
     tokens_out = tokens_out or 0
+    
+    # Try lookup by model name only
     result = await db.execute(
         select(ModelPricing).where(ModelPricing.model == model)
     )
     pricing = result.scalar_one_or_none()
+    
+    # If not found and provider specified, try provider+model combination
     if not pricing and provider:
         result = await db.execute(
             select(ModelPricing).where(
@@ -62,11 +83,15 @@ async def calculate_span_cost(
             )
         )
         pricing = result.scalar_one_or_none()
+    
     if not pricing:
         return None
-    return (tokens_in / 1000 * pricing.input_price_per_1k) + (
-        tokens_out / 1000 * pricing.output_price_per_1k
-    )
+    
+    # Calculate cost: (input_tokens * input_price) + (output_tokens * output_price)
+    input_cost = (tokens_in / 1000) * pricing.input_price_per_1k
+    output_cost = (tokens_out / 1000) * pricing.output_price_per_1k
+    
+    return input_cost + output_cost
 
 
 async def ingest_trace(
@@ -168,9 +193,46 @@ async def ingest_trace(
 
 
 def percentile(values: list[float], p: float) -> float | None:
+    """Calculate the p-th percentile of a list of values.
+    
+    Uses linear interpolation between the two closest ranks when the percentile
+    position is not an integer. This follows the R-7 method commonly used in 
+    statistical software.
+    
+    Args:
+        values: List of float values to calculate percentile from
+        p: Percentile to calculate (0-100)
+        
+    Returns:
+        The p-th percentile value, or None if list is empty
+        
+    Examples:
+        >>> percentile([1, 2, 3, 4, 5], 50)  # 50th percentile (median)
+        3.0
+        >>> percentile([1, 2, 3, 4], 75)       # 75th percentile
+        3.25
+    """
     if not values:
         return None
+    
+    if len(values) == 1:
+        return values[0]
+    
     sorted_vals = sorted(values)
-    idx = int(len(sorted_vals) * p / 100)
-    idx = min(idx, len(sorted_vals) - 1)
-    return sorted_vals[idx]
+    # Calculate position using R-7 method (linear interpolation)
+    n = len(sorted_vals)
+    pos = (p / 100) * (n - 1)
+    
+    if pos.is_integer():
+        # Exact position
+        return sorted_vals[int(pos)]
+    else:
+        # Linear interpolation between two closest values
+        lower_idx = int(pos)
+        upper_idx = lower_idx + 1
+        weight = pos - lower_idx
+        
+        lower_val = sorted_vals[lower_idx]
+        upper_val = sorted_vals[min(upper_idx, n - 1)]
+        
+        return lower_val + weight * (upper_val - lower_val)

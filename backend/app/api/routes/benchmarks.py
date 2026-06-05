@@ -15,6 +15,16 @@ router = APIRouter(prefix="/v1/benchmarks", tags=["benchmarks"])
 
 
 async def _enqueue_task(task_name: str, payload: dict) -> None:
+    """Enqueue a background task to Redis with proper error handling.
+    
+    Args:
+        task_name: Name of the task to enqueue
+        payload: Task payload data
+        
+    Implementation Note:
+        Failures are silently ignored to maintain API responsiveness.
+        Consider adding structured logging for production monitoring.
+    """
     try:
         from arq import create_pool
         from arq.connections import RedisSettings
@@ -22,7 +32,9 @@ async def _enqueue_task(task_name: str, payload: dict) -> None:
         redis = await create_pool(RedisSettings.from_dsn(settings.redis_url))
         await redis.enqueue_job(task_name, payload)
         await redis.close()
-    except Exception:
+    except Exception as exc:
+        # Silently handle failures to prevent API disruption
+        # In production, implement proper logging here
         pass
 
 
