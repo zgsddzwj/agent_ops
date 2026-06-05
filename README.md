@@ -1,21 +1,60 @@
-# AgentOps - 智能体运维平台
+# AgentOps - LangChain/LangGraph 智能体运维平台
 
-面向 **LangChain / LangGraph** 的多项目 AgentOps 平台。将任意外部 `ai_project` 注册接入，统一完成评估、可观测性、性能/成本/延迟监控、安全评测与多模型对比。
+<p align="center">
+  <img src="./docs/images/architecture.png" alt="AgentOps Architecture" width="600"/>
+</p>
 
-## 核心能力
+<p align="center">
+  <strong>一站式AI Agent运维管理 • 评估 • 监控 • 安全防护 • 多模型对比</strong>
+</p>
 
-| 能力 | 说明 |
-|------|------|
-| **多项目接入** | `agent-ops init/link` 注册外部项目，Dashboard 按 project 隔离 |
-| **评估框架** | 离线 Eval、smoke/regression 套件、精确匹配与行为判定 |
-| **可观测性** | LangChain Callback 采集 LLM/Tool/Chain 全链路 Trace |
-| **性能监控** | TTFT、E2E 延迟、Token 用量、成本核算（P50/P95） |
-| **模型对比** | 同一项目下对比 OpenAI / Qwen / DeepSeek 等模型表现 |
-| **安全评测** | 提示词注入、Jailbreak、数据泄露等测试套件 |
-| **运行时加固** | SDK `SecurityPipeline`：输入过滤、注入检测、PII 脱敏、限流 |
-| **告警** | 成本/延迟/错误率/安全通过率阈值 + Webhook |
+<p align="center">
+  <a href="https://github.com/zgsddzwj/agent_ops/releases">
+    <img src="https://img.shields.io/github/v/release/zgsddzwj/agent_ops?style=flat-square" alt="Version"/>
+  </a>
+  <a href="https://github.com/zgsddzwj/agent_ops/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/zgsddzwj/agent_ops?style=flat-square" alt="License"/>
+  </a>
+  <a href="https://github.com/zgsddzwj/agent_ops/stargazers">
+    <img src="https://img.shields.io/github/stars/zgsddzwj/agent_ops?style=flat-square" alt="Stars"/>
+  </a>
+</p>
 
-## 架构
+AgentOps 是一个专为 LangChain/LangGraph 生态设计的全栈智能体运维(MLOps)平台，为AI Agent项目提供统一的可观测性、评估、监控和安全保障基础设施。
+
+## ✨ 核心能力
+
+### 🔧 统一项目管理
+- 多AI项目统一注册和管理
+- 项目级Dashboard隔离展示
+- 统一的CLI入口和API管理
+
+### 📊 全面评估体系  
+- 离线评估框架（smoke test、regression测试套件）
+- 多维度判定（精确匹配、行为逻辑判定）
+- 内置评估数据集和测试用例
+
+### 🔍 全链路可观测性
+- LangChain Callback集成，自动采集全链路Trace
+- 实时性能监控（TTFT、E2E延迟、Token消耗）
+- 精确成本核算（P50/P95分位统计）
+
+### 🤖 多模型智能对比
+- 横向对比OpenAI/Qwen/DeepSeek等主流模型
+- 预设模型组合包（domestic、international、sota、cost_efficient）
+- 多维度对比矩阵（TTFT、延迟、成本、质量）
+
+### 🛡️ 安全防护体系
+- 安全评测套件（提示词注入、Jailbreak、数据泄露）
+- SDK SecurityPipeline运行时防护
+- 内置安全测试用例和扫描工具
+
+### 🚨 智能告警系统
+- 多维度阈值告警（成本、延迟、错误率、安全）
+- 灵活Webhooks通知机制
+- 自定义告警规则
+
+## 🏗️ 架构设计
 
 ```
 ┌─────────────────┐     SDK (实时)      ┌──────────────────┐
@@ -30,27 +69,15 @@
                                         └──────────────────┘
 ```
 
-```
-agent_ops/
-├── packages/
-│   ├── agent-ops-sdk/       # instrumentation + SecurityPipeline
-│   └── agent-ops-cli/       # init, link, eval, benchmark, security, check
-├── backend/                 # FastAPI + SQLAlchemy + Alembic
-├── worker/                  # ARQ 异步任务（eval / benchmark / security / 聚合）
-├── web/                     # Next.js 14 Dashboard
-├── evals/                   # 内置 smoke / regression 数据集
-├── security/                # 安全测试用例 + 扫描器
-├── benchmarks/              # 模型对比预设（domestic / sota / …）
-├── examples/demo-agent/     # 可运行的示例 ai_project
-└── infra/                   # Docker Compose + Dockerfile
-```
+## 🛠️ 技术栈
 
-## 环境要求
-
-- Python 3.11+
-- Node.js 20+（Dashboard）
-- Docker（PostgreSQL + Redis，推荐）
-- LangChain / LangGraph 项目（被测 Agent）
+- **SDK**: Python instrumentation + SecurityPipeline
+- **CLI**: Typer命令行工具（init/link/eval/benchmark等）  
+- **后端**: FastAPI + SQLAlchemy + Alembic（异步架构）
+- **数据库**: PostgreSQL + Redis
+- **任务处理**: ARQ异步任务框架
+- **前端**: Next.js 14 + TailwindCSS
+- **基础设施**: Docker Compose
 
 ## 快速开始
 
