@@ -1,11 +1,24 @@
+import logging
 import os
+import sys
 from pathlib import Path
 
 import httpx
 import typer
 import yaml
 from rich.console import Console
+from rich.logging import RichHandler
+from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(message)s",
+    datefmt="[%X]",
+    handlers=[RichHandler(rich_tracebacks=True)]
+)
+logger = logging.getLogger(__name__)
 
 from agent_ops_cli.project_loader import (
     DEFAULT_MANIFEST,

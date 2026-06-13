@@ -1,13 +1,17 @@
 import asyncio
 import json
+import logging
 import threading
 import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import httpx
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 DEFAULT_PRICING = {
     ("openai", "gpt-4o"): (2.50, 10.00),
