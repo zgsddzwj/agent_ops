@@ -1,13 +1,24 @@
+import json
+import logging
+import time
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import alerts, benchmarks, evals, metrics, projects, security, traces
 from app.core.config import settings
-from app.core.database import async_session, engine
+from app.core.database import async_session, engine, init_database
 from app.models import Base
 from app.services.ingest import seed_model_pricing
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
