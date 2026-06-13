@@ -91,9 +91,15 @@ cd agent_ops
 python3 -m venv .venv
 source .venv/bin/activate
 
+# 使用 uv 加速安装（推荐）
+# curl -LsSf https://astral.sh/uv/install.sh | sh
+# uv sync --frozen
+
+# 或使用 pip
 pip install -e packages/agent-ops-sdk \
             -e packages/agent-ops-cli \
-            -e backend
+            -e backend \
+            -e worker
 ```
 
 ### 2. 启动基础设施
