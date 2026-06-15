@@ -2,7 +2,7 @@ import json
 import logging
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -63,4 +63,38 @@ app.include_router(alerts.router)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "agent-ops-api"}
+    """Health check endpoint that validates database and Redis connectivity."""
+    start_time = time.time()
+
+    health_status = {
+        "status": "ok",
+        "service": "agent-ops-api",
+        "version": "0.1.0",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+    # Check database connectivity
+    try:
+        from app.core.database import async_session
+        async with async_session() as db:
+            await db.execute("SELECT 1")
+        health_status["database"] = "connected"
+    except Exception as e:
+        logger.error(f"Database health check failed: {e}")
+        health_status["database"] = "disconnected"
+        health_status["status"] = "degraded"
+
+    # Check Redis connectivity
+    try:
+        import redis.asyncio as redis
+        redis_client = redis.from_url(settings.redis_url)
+        await redis_client.ping()
+        health_status["redis"] = "connected"
+        await redis_client.aclose()
+    except Exception as e:
+        logger.warning(f"Redis health check failed: {e}")
+        health_status["redis"] = "disconnected"
+
+    health_status["response_time_ms"] = round((time.time() - start_time) * 1000, 2)
+
+    return health_status

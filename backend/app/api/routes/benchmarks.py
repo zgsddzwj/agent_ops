@@ -5,37 +5,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_project
-from app.core.config import settings
 from app.core.database import get_db
 from app.models import ModelBenchmark, ModelBenchmarkResult, Project
 from app.schemas import BenchmarkCreate, BenchmarkResponse
 from app.services.ingest import percentile
+from app.services.task_queue import enqueue_task
 
 router = APIRouter(prefix="/v1/benchmarks", tags=["benchmarks"])
-
-
-async def _enqueue_task(task_name: str, payload: dict) -> None:
-    """Enqueue a background task to Redis with proper error handling.
-    
-    Args:
-        task_name: Name of the task to enqueue
-        payload: Task payload data
-        
-    Implementation Note:
-        Failures are silently ignored to maintain API responsiveness.
-        Consider adding structured logging for production monitoring.
-    """
-    try:
-        from arq import create_pool
-        from arq.connections import RedisSettings
-
-        redis = await create_pool(RedisSettings.from_dsn(settings.redis_url))
-        await redis.enqueue_job(task_name, payload)
-        await redis.close()
-    except Exception as exc:
-        # Silently handle failures to prevent API disruption
-        # In production, implement proper logging here
-        pass
 
 
 @router.post("", response_model=BenchmarkResponse)
@@ -54,7 +30,7 @@ async def create_benchmark(
     db.add(benchmark)
     await db.flush()
 
-    await _enqueue_task(
+    await enqueue_task(
         "run_benchmark_task",
         {
             "benchmark_id": str(benchmark.id),
