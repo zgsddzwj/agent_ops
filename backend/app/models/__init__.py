@@ -68,7 +68,11 @@ class ProjectConfig(Base):
 
 class Run(Base):
     __tablename__ = "runs"
-    __table_args__ = (Index("ix_runs_project_created", "project_id", "created_at"),)
+    __table_args__ = (
+        Index("ix_runs_project_created", "project_id", "created_at"),
+        Index("ix_runs_project_status", "project_id", "status"),
+        Index("ix_runs_project_model", "project_id", "model_provider", "model_name"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"), nullable=False)
@@ -91,7 +95,10 @@ class Run(Base):
 
 class Span(Base):
     __tablename__ = "spans"
-    __table_args__ = (Index("ix_spans_run_id", "run_id"),)
+    __table_args__ = (
+        Index("ix_spans_run_id", "run_id"),
+        Index("ix_spans_run_type", "run_id", "span_type"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     run_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("runs.id"), nullable=False)
@@ -280,6 +287,8 @@ class AlertEvent(Base):
     value: Mapped[float | None] = mapped_column(Float)
     acknowledged: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (Index("ix_alert_events_project_created", "project_id", "created_at"),)
 
 
 class ModelPricing(Base):
