@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import alerts, benchmarks, evals, metrics, projects, security, traces
 from app.core.config import settings
-from app.core.database import async_session, engine, init_database
+from app.core.database import async_session, check_database_health, engine, init_database
 from app.models import Base
 from app.services.ingest import seed_model_pricing
 
@@ -23,13 +23,22 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    async with async_session() as db:
-        await seed_model_pricing(db)
-        await db.commit()
-    yield
-    await engine.dispose()
+    """Application lifespan with structured startup/shutdown."""
+    logger.info("Starting up AgentOps API...")
+    try:
+        await init_database()
+        async with async_session() as db:
+            await seed_model_pricing(db)
+            await db.commit()
+        logger.info("AgentOps API startup completed successfully")
+        yield
+    except Exception as e:
+        logger.error(f"Error during startup: {e}")
+        raise
+    finally:
+        logger.info("Shutting down AgentOps API...")
+        await engine.dispose()
+        logger.info("AgentOps API shutdown completed")
 
 
 app = FastAPI(title="AgentOps API", version="0.1.0", lifespan=lifespan)
@@ -74,14 +83,9 @@ async def health():
     }
 
     # Check database connectivity
-    try:
-        from app.core.database import async_session
-        async with async_session() as db:
-            await db.execute("SELECT 1")
-        health_status["database"] = "connected"
-    except Exception as e:
-        logger.error(f"Database health check failed: {e}")
-        health_status["database"] = "disconnected"
+    db_healthy = await check_database_health()
+    health_status["database"] = "connected" if db_healthy else "disconnected"
+    if not db_healthy:
         health_status["status"] = "degraded"
 
     # Check Redis connectivity
@@ -96,5 +100,4 @@ async def health():
         health_status["redis"] = "disconnected"
 
     health_status["response_time_ms"] = round((time.time() - start_time) * 1000, 2)
-
     return health_status
