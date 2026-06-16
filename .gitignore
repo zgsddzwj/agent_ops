@@ -1,17 +1,65 @@
+# ─── Python ───
 __pycache__/
 *.py[cod]
+*$py.class
 *.egg-info/
-.venv/
-venv/
-.env
-*.db
-node_modules/
-.next/
+*.egg
 dist/
 build/
+.eggs/
+
+# ─── Virtual environments ───
+.venv/
+venv/
+env/
+
+# ─── Environment and secrets ───
+.env
+.env.local
+.env.*.local
+.env.agent-ops
+
+# ─── Database ───
+*.db
+*.sqlite3
+
+# ─── Node.js / Frontend ───
+node_modules/
+.next/
+out/
+.turbo/
+
+# ─── Testing ───
 .coverage
 htmlcov/
 .pytest_cache/
+coverage.xml
+
+# ─── Linting / Type checking ───
 .ruff_cache/
-*.log
+.mypy_cache/
+.pytype/
+
+# ─── IDE ───
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ─── OS files ───
 .DS_Store
+Thumbs.db
+Desktop.ini
+
+# ─── Logs ───
+*.log
+logs/
+
+# ─── Docker ───
+docker-compose.override.yml
+
+# ─── Misc ───
+*.bak
+*.tmp
+.cache/
