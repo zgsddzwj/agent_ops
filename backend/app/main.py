@@ -4,8 +4,9 @@ import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.routes import alerts, benchmarks, evals, metrics, projects, security, traces
 from app.core.config import settings
@@ -13,7 +14,6 @@ from app.core.database import async_session, check_database_health, engine, init
 from app.models import Base
 from app.services.ingest import seed_model_pricing
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -41,18 +41,69 @@ async def lifespan(app: FastAPI):
         logger.info("AgentOps API shutdown completed")
 
 
-app = FastAPI(title="AgentOps API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(
+    title="AgentOps API",
+    version="0.1.0",
+    lifespan=lifespan,
+    docs_url="/docs" if getattr(settings, "debug", False) else None,
+    redoc_url="/redoc" if getattr(settings, "debug", False) else None,
+    openapi_url="/openapi.json" if getattr(settings, "debug", False) else None,
+)
 
-# Add custom exception handling middleware
+
+# ─── Exception handling middleware ───
+
 from app.core.middleware import ExceptionHandlerMiddleware
 
-async def exception_middleware(request, call_next):
+
+@app.middleware("http")
+async def exception_middleware(request: Request, call_next):
     handler = ExceptionHandlerMiddleware()
     return await handler(request, call_next)
 
-app.middleware("http")(exception_middleware)
 
-# CORS middleware
+# ─── Simple in-process rate limiter ───
+
+_rate_limit_store: dict[str, list[float]] = {}
+
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """Rate limiting middleware using in-memory sliding window."""
+    if not getattr(settings, "rate_limit_enabled", False):
+        return await call_next(request)
+
+    # Skip rate limiting for health check
+    if request.url.path == "/health":
+        return await call_next(request)
+
+    client_ip = request.client.host if request.client else "unknown"
+    key = f"rl:{client_ip}"
+    now = time.time()
+    window = getattr(settings, "rate_limit_window", 60)
+    max_requests = getattr(settings, "rate_limit_requests", 100)
+
+    if key not in _rate_limit_store:
+        _rate_limit_store[key] = []
+
+    # Remove expired entries
+    _rate_limit_store[key] = [t for t in _rate_limit_store[key] if now - t < window]
+
+    if len(_rate_limit_store[key]) >= max_requests:
+        return JSONResponse(
+            status_code=429,
+            content={
+                "error": "Too many requests",
+                "detail": f"Rate limit: {max_requests} requests per {window}s",
+            },
+        )
+
+    _rate_limit_store[key].append(now)
+    return await call_next(request)
+
+
+# ─── CORS middleware ───
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
@@ -60,6 +111,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ─── Routes ───
 
 app.include_router(projects.router)
 app.include_router(traces.router)
