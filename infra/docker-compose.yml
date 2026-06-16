@@ -17,6 +17,11 @@ services:
       retries: 5
     networks:
       - agentops-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
@@ -29,7 +34,20 @@ services:
       retries: 5
     networks:
       - agentops-network
-    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru"]
+    command: [
+      "redis-server",
+      "--appendonly", "yes",
+      "--maxmemory", "512mb",
+      "--maxmemory-policy", "allkeys-lru",
+      "--requirepass", "${REDIS_PASSWORD:-}",
+    ]
+    volumes:
+      - redisdata:/data
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    restart: unless-stopped
 
   backend:
     build:
@@ -38,30 +56,48 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql+asyncpg://agentops:agentops@postgres:5432/agentops
-      DATABASE_URL_SYNC: postgresql://agentops:agentops@postgres:5432/agentops
-      REDIS_URL: redis://redis:6379/0
-      SECRET_KEY: dev-secret-key
-      CORS_ORIGINS: http://localhost:3000
+      DATABASE_URL: postgresql+asyncpg://agentops:${POSTGRES_PASSWORD:-agentops}@postgres:5432/agentops
+      DATABASE_URL_SYNC: postgresql://agentops:${POSTGRES_PASSWORD:-agentops}@postgres:5432/agentops
+      REDIS_URL: redis://:${REDIS_PASSWORD:-}@redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      DEBUG: ${DEBUG:-false}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      RATE_LIMIT_REQUESTS: ${RATE_LIMIT_REQUESTS:-100}
+      RATE_LIMIT_WINDOW: ${RATE_LIMIT_WINDOW:-60}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - agentops-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    restart: unless-stopped
 
   worker:
     build:
       context: ..
       dockerfile: infra/Dockerfile.worker
     environment:
-      DATABASE_URL: postgresql+asyncpg://agentops:agentops@postgres:5432/agentops
-      DATABASE_URL_SYNC: postgresql://agentops:agentops@postgres:5432/agentops
-      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql+asyncpg://agentops:${POSTGRES_PASSWORD:-agentops}@postgres:5432/agentops
+      DATABASE_URL_SYNC: postgresql://agentops:${POSTGRES_PASSWORD:-agentops}@postgres:5432/agentops
+      REDIS_URL: redis://:${REDIS_PASSWORD:-}@redis:6379/0
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - agentops-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    restart: unless-stopped
 
   web:
     build:
@@ -70,12 +106,20 @@ services:
     ports:
       - "3000:3000"
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     depends_on:
       - backend
+    networks:
+      - agentops-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    restart: unless-stopped
 
 volumes:
   pgdata:
+  redisdata:
 
 networks:
   agentops-network:
