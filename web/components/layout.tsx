@@ -62,11 +62,21 @@ export function ProjectSwitcher({ projects }: { projects: { id: string; name: st
   );
 }
 
-export function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+export function StatCard({
+  label,
+  value,
+  sub,
+  valueClassName,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  valueClassName?: string;
+}) {
   return (
     <div className="card">
       <div className="text-sm text-[var(--muted)]">{label}</div>
-      <div className="mt-1 text-2xl font-semibold">{value}</div>
+      <div className={`mt-1 text-2xl font-semibold ${valueClassName || ""}`}>{value}</div>
       {sub && <div className="mt-1 text-xs text-[var(--muted)]">{sub}</div>}
     </div>
   );
