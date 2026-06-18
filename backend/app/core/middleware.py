@@ -4,12 +4,12 @@ import logging
 import time
 import uuid
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
-from sqlalchemy.exc import SQLAlchemyError
 import httpx
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings
 
