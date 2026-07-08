@@ -2,48 +2,73 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 jobs:
   lint:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.11]
-    
+        python-version: ["3.11", "3.12"]
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-        cache: 'pip'
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install ruff
-    
-    - name: Run Ruff linting
-      run: |
-        ruff check .
-      
-    - name: Run Ruff formatting
-      run: |
-        ruff format --check .
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install Ruff
+        run: pip install ruff
+
+      - name: Run Ruff linting
+        run: ruff check .
+
+      - name: Run Ruff formatting check
+        run: ruff format --check .
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Bandit
+        run: pip install bandit[toml]
+
+      - name: Run Bandit security scan
+        run: bandit -r backend/ packages/ -f json -o bandit-report.json || true
+
+      - name: Upload security report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: bandit-report.json
+
+      - name: Check for known vulnerabilities
+        run: |
+          pip install safety
+          safety check --short || true
 
   test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.11]
-    
+        python-version: ["3.11", "3.12"]
+
     services:
       postgres:
-        image: postgres:15
+        image: postgres:16-alpine
         env:
           POSTGRES_PASSWORD: agentops
           POSTGRES_USER: agentops
@@ -55,7 +80,7 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-      
+
       redis:
         image: redis:7-alpine
         options: >-
@@ -65,82 +90,112 @@ jobs:
           --health-retries 5
         ports:
           - 6379:6379
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-        cache: 'pip'
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e packages/agent-ops-sdk
-        pip install -e packages/agent-ops-cli  
-        pip install -e backend
-        pip install -e worker
-        pip install pytest pytest-asyncio httpx
-    
-    - name: Wait for PostgreSQL
-      run: |
-        until pg_isready -h localhost -p 5432 -U agentops; do
-          sleep 1
-        done
-    
-    - name: Run tests
-      env:
-        DATABASE_URL: postgresql+asyncpg://agentops:agentops@localhost:5432/agentops
-        REDIS_URL: redis://localhost:6379/0
-      run: |
-        pytest tests/ -v --cov=.
 
-  frontend-lint:
-    runs-on: ubuntu-latest
-    
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: web/package-lock.json
-    
-    - name: Install frontend dependencies
-      run: |
-        cd web
-        npm ci
-    
-    - name: Run TypeScript check
-      run: |
-        cd web
-        npm run build
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -e packages/agent-ops-sdk
+          pip install -e packages/agent-ops-cli
+          pip install -e backend
+          pip install -e worker
+          pip install pytest pytest-asyncio httpx pytest-cov
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in $(seq 1 30); do
+            if pg_isready -h localhost -p 5432 -U agentops; then
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://agentops:agentops@localhost:5432/agentops
+          DATABASE_URL_SYNC: postgresql://agentops:agentops@localhost:5432/agentops
+          REDIS_URL: redis://localhost:6379/0
+          SECRET_KEY: ci-test-secret
+          DEBUG: "true"
+        run: pytest tests/ -v --cov=. --cov-report=xml
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-${{ matrix.python-version }}
+          path: coverage.xml
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd web
+          npm ci
+
+      - name: TypeScript check
+        run: |
+          cd web
+          npx tsc --noEmit
+
+      - name: Build
+        run: |
+          cd web
+          npm run build
 
   docker-build:
     runs-on: ubuntu-latest
-    
+    needs: [lint, test]
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    
-    - name: Build Docker images
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: infra/Dockerfile.backend
-        tags: agentops-backend:ci
-        load: true
-    
-    - name: Build frontend Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: ./web/
-        file: ../infra/Dockerfile.web
-        tags: agentops-web:ci
-        load: true
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/Dockerfile.backend
+          tags: agentops-backend:ci
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build worker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/Dockerfile.worker
+          tags: agentops-worker:ci
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/Dockerfile.web
+          tags: agentops-web:ci
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
