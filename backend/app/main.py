@@ -1,22 +1,26 @@
-import json
+"""AgentOps API - main application module."""
+
 import logging
 import time
+from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.routes import alerts, benchmarks, evals, metrics, projects, security, traces
 from app.core.config import settings
 from app.core.database import async_session, check_database_health, engine, init_database
-from app.models import Base
+from app.core.middleware import ExceptionHandlerMiddleware
 from app.services.ingest import seed_model_pricing
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -50,21 +54,41 @@ app = FastAPI(
     openapi_url="/openapi.json" if settings.debug else None,
 )
 
+# ─── Middleware (order: outermost first) ───
 
-# ─── Exception handling middleware ───
+# Trusted host validation (prevent host header attacks)
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=["*"] if settings.debug else ["localhost", "127.0.0.1"],
+)
 
-from app.core.middleware import ExceptionHandlerMiddleware
+# GZip compression for responses > 1KB
+app.add_middleware(GZipMiddleware, minimum_size=1024)
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins_list,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ─── Exception handling (innermost, closest to routes) ───
+
+_exception_handler = ExceptionHandlerMiddleware()
 
 
 @app.middleware("http")
 async def exception_middleware(request: Request, call_next):
-    handler = ExceptionHandlerMiddleware()
-    return await handler(request, call_next)
+    """Global exception handler middleware (singleton instance)."""
+    return await _exception_handler(request, call_next)
 
 
-# ─── Simple in-process rate limiter ───
+# ─── Rate limiter ───
 
-_rate_limit_store: dict[str, list[float]] = {}
+_rate_limit_store: dict[str, list[float]] = defaultdict(list)
+_RATE_LIMIT_MAX_IPS = 10_000  # Prevent unbounded memory growth
 
 
 @app.middleware("http")
@@ -83,11 +107,19 @@ async def rate_limit_middleware(request: Request, call_next):
     window = settings.rate_limit_window
     max_requests = settings.rate_limit_requests
 
-    if key not in _rate_limit_store:
-        _rate_limit_store[key] = []
+    # Periodic cleanup: if store is too large, evict all expired entries
+    if len(_rate_limit_store) > _RATE_LIMIT_MAX_IPS:
+        expired_keys = [
+            k for k, timestamps in _rate_limit_store.items()
+            if not timestamps or now - timestamps[-1] > window
+        ]
+        for k in expired_keys:
+            del _rate_limit_store[k]
 
-    # Remove expired entries
-    _rate_limit_store[key] = [t for t in _rate_limit_store[key] if now - t < window]
+    # Sliding window: remove expired timestamps
+    _rate_limit_store[key] = [
+        t for t in _rate_limit_store[key] if now - t < window
+    ]
 
     if len(_rate_limit_store[key]) >= max_requests:
         return JSONResponse(
@@ -100,17 +132,6 @@ async def rate_limit_middleware(request: Request, call_next):
 
     _rate_limit_store[key].append(now)
     return await call_next(request)
-
-
-# ─── CORS middleware ───
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 
 # ─── Routes ───
