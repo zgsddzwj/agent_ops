@@ -1,14 +1,39 @@
+# ─── Stage 1: Build ───
 FROM node:20-alpine AS builder
+
 WORKDIR /app
+
 COPY web/package*.json ./
 RUN npm ci
+
 COPY web/ ./
 RUN npm run build
 
+# ─── Stage 2: Runtime ───
 FROM node:20-alpine
+
 WORKDIR /app
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
+
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
+
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001 -G nodejs
+
+# Copy standalone build output
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+
+USER nextjs
+
 ENV PORT=3000
+ENV NODE_ENV=production
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
+
+ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "server.js"]

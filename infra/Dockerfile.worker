@@ -1,12 +1,52 @@
-FROM python:3.11-slim
-WORKDIR /app
-RUN pip install uv
-COPY pyproject.toml worker/pyproject.toml backend/pyproject.toml packages/agent-ops-sdk/pyproject.toml packages/agent-ops-cli/pyproject.toml ./
-COPY worker/ ./worker/
+# ─── Stage 1: Build dependencies ───
+FROM python:3.11-slim AS builder
+
+WORKDIR /build
+
+RUN pip install --no-cache-dir uv
+
+# Copy pyproject files first for layer caching
+COPY packages/agent-ops-sdk/pyproject.toml ./packages/agent-ops-sdk/
+COPY packages/agent-ops-cli/pyproject.toml ./packages/agent-ops-cli/
+COPY backend/pyproject.toml ./backend/
+COPY worker/pyproject.toml ./worker/
+COPY pyproject.toml ./
+
+# Copy source code
+COPY packages/agent-ops-sdk/ ./packages/agent-ops-sdk/
+COPY packages/agent-ops-cli/ ./packages/agent-ops-cli/
 COPY backend/ ./backend/
-COPY packages/ ./packages/
+COPY worker/ ./worker/
 COPY evals/ ./evals/
 COPY security/ ./security/
 COPY benchmarks/ ./benchmarks/
-RUN pip install -e ./packages/agent-ops-sdk -e ./packages/agent-ops-cli -e ./backend -e ./worker
+
+# Install all packages into a target directory
+RUN pip install --no-cache-dir --target=/install \
+    ./packages/agent-ops-sdk \
+    ./packages/agent-ops-cli \
+    ./backend \
+    ./worker
+
+# ─── Stage 2: Runtime ───
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copy installed packages from builder
+COPY --from=builder /install /usr/local/lib/python3.11/site-packages
+
+# Copy application code
+COPY --from=builder /build/worker/ ./worker/
+COPY --from=builder /build/packages/ ./packages/
+COPY --from=builder /build/evals/ ./evals/
+COPY --from=builder /build/security/ ./security/
+COPY --from=builder /build/benchmarks/ ./benchmarks/
+
+# Create non-root user
+RUN groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuser \
+    && chown -R appuser:appuser /app
+USER appuser
+
+ENV PYTHONPATH=/app
 CMD ["python", "-m", "worker.main"]
