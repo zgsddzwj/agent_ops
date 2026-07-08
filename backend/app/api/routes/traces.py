@@ -13,6 +13,8 @@ from app.services.ingest import ingest_trace
 
 router = APIRouter(prefix="/v1", tags=["traces"])
 
+MAX_SPANS_PER_INGEST = 500
+
 
 @router.post("/traces/ingest")
 async def ingest_traces(
@@ -20,6 +22,11 @@ async def ingest_traces(
     project: Project = Depends(get_current_project),
     db: AsyncSession = Depends(get_db),
 ):
+    if len(body.spans) > MAX_SPANS_PER_INGEST:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Too many spans: {len(body.spans)} > max {MAX_SPANS_PER_INGEST}",
+        )
     run_data = body.run.model_dump() if body.run else None
     spans_data = [s.model_dump() for s in body.spans]
     for s in spans_data:
@@ -105,8 +112,8 @@ async def list_runs(
     project: Project = Depends(get_current_project),
     db: AsyncSession = Depends(get_db),
     status: str | None = None,
-    limit: int = Query(50, le=200),
-    offset: int = 0,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
 ):
     query = select(Run).where(Run.project_id == project.id)
     if status:

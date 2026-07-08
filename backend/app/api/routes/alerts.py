@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,12 +46,14 @@ async def list_alert_rules(
 async def list_alert_events(
     project: Project = Depends(get_current_project),
     db: AsyncSession = Depends(get_db),
-    limit: int = 50,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
 ):
     result = await db.execute(
         select(AlertEvent)
         .where(AlertEvent.project_id == project.id)
         .order_by(AlertEvent.created_at.desc())
+        .offset(offset)
         .limit(limit)
     )
     return result.scalars().all()
