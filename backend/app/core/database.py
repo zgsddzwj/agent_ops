@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 engine = create_async_engine(
     settings.database_url,
-    echo=getattr(settings, "debug", False),
+    echo=settings.debug,
     poolclass=AsyncAdaptedQueuePool,
     pool_size=20,
     max_overflow=30,

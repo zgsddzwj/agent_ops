@@ -45,9 +45,9 @@ app = FastAPI(
     title="AgentOps API",
     version="0.1.0",
     lifespan=lifespan,
-    docs_url="/docs" if getattr(settings, "debug", False) else None,
-    redoc_url="/redoc" if getattr(settings, "debug", False) else None,
-    openapi_url="/openapi.json" if getattr(settings, "debug", False) else None,
+    docs_url="/docs" if settings.debug else None,
+    redoc_url="/redoc" if settings.debug else None,
+    openapi_url="/openapi.json" if settings.debug else None,
 )
 
 
@@ -70,7 +70,7 @@ _rate_limit_store: dict[str, list[float]] = {}
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     """Rate limiting middleware using in-memory sliding window."""
-    if not getattr(settings, "rate_limit_enabled", False):
+    if not settings.rate_limit_enabled:
         return await call_next(request)
 
     # Skip rate limiting for health check
@@ -80,8 +80,8 @@ async def rate_limit_middleware(request: Request, call_next):
     client_ip = request.client.host if request.client else "unknown"
     key = f"rl:{client_ip}"
     now = time.time()
-    window = getattr(settings, "rate_limit_window", 60)
-    max_requests = getattr(settings, "rate_limit_requests", 100)
+    window = settings.rate_limit_window
+    max_requests = settings.rate_limit_requests
 
     if key not in _rate_limit_store:
         _rate_limit_store[key] = []

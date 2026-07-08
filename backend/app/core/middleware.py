@@ -171,7 +171,7 @@ async def log_request_response(
     This is a lightweight logging middleware that can be enabled/disabled
     via configuration for sensitive environments.
     """
-    if not getattr(settings, "log_requests", False):
+    if not settings.log_requests:
         return await call_next(request)
     
     request_id = getattr(request.state, "request_id", str(uuid.uuid4()))
