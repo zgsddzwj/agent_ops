@@ -1,3 +1,9 @@
+"""Background worker tasks for eval, benchmark, security scan, and metric aggregation.
+
+These tasks are executed by the ARQ worker process and handle long-running
+operations that should not block the API request cycle.
+"""
+
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -20,7 +26,7 @@ from app.services.ingest import percentile
 logger = logging.getLogger(__name__)
 
 
-def _create_session_factory() -> tuple:
+def _create_session_factory() -> tuple[create_async_engine, async_sessionmaker[AsyncSession]]:
     """Create a new async engine and session factory for worker tasks.
     
     Returns:
@@ -246,7 +252,11 @@ async def run_security_scan_task(ctx: dict, payload: dict) -> dict:
 
 
 async def aggregate_metrics_task(ctx: dict) -> dict:
-    """Aggregate metrics task with proper error handling."""
+    """Hourly metric aggregation and alert evaluation cron task.
+    
+    Aggregates run data into MetricAggregate buckets and evaluates
+    all enabled alert rules, firing events and webhooks as needed.
+    """
     engine, session_factory = _create_session_factory()
 
     try:
@@ -267,6 +277,7 @@ async def aggregate_metrics_task(ctx: dict) -> dict:
 
 
 class WorkerSettings:
+    """ARQ worker configuration with task functions and cron schedules."""
     redis_settings = None
     functions = [
         run_eval_task,
