@@ -1,3 +1,9 @@
+"""LangChain callback handler for automatic AgentOps trace ingestion.
+
+This handler hooks into LangChain's callback system to automatically
+capture LLM calls, tool usage, and chain executions as AgentOps spans.
+"""
+
 import time
 import uuid
 from datetime import datetime, timezone
@@ -37,18 +43,21 @@ class AgentOpsCallbackHandler(BaseCallbackHandler):
         return str(run_id)
 
     def on_llm_start(self, serialized: dict, prompts: list[str], *, run_id: UUID, **kwargs: Any) -> None:
+        """Called when LLM starts generating a response."""
         self._ensure_run()
         key = self._span_id(run_id)
         self._llm_starts[key] = time.perf_counter()
         self._llm_token_counts[key] = 0
 
     def on_llm_new_token(self, token: str, *, run_id: UUID, **kwargs: Any) -> None:
+        """Called when a new token is received (streaming mode)."""
         key = self._span_id(run_id)
         if key not in self._llm_first_token:
             self._llm_first_token[key] = time.perf_counter()
         self._llm_token_counts[key] = self._llm_token_counts.get(key, 0) + 1
 
     def on_llm_end(self, response: LLMResult, *, run_id: UUID, **kwargs: Any) -> None:
+        """Called when LLM finishes generating a response. Records span with metrics."""
         run_uuid = self._ensure_run()
         key = self._span_id(run_id)
         start = self._llm_starts.pop(key, time.perf_counter())
@@ -117,6 +126,7 @@ class AgentOpsCallbackHandler(BaseCallbackHandler):
         )
 
     def on_llm_error(self, error: BaseException, *, run_id: UUID, **kwargs: Any) -> None:
+        """Called when LLM encounters an error. Records error span."""
         run_uuid = self._ensure_run()
         self.client.add_span(
             {
@@ -129,10 +139,12 @@ class AgentOpsCallbackHandler(BaseCallbackHandler):
         )
 
     def on_tool_start(self, serialized: dict, input_str: str, *, run_id: UUID, **kwargs: Any) -> None:
+        """Called when a tool starts execution."""
         self._ensure_run()
         self._span_starts[self._span_id(run_id)] = time.perf_counter()
 
     def on_tool_end(self, output: str, *, run_id: UUID, **kwargs: Any) -> None:
+        """Called when a tool finishes execution. Records tool span with latency."""
         run_uuid = self._ensure_run()
         key = self._span_id(run_id)
         start = self._span_starts.pop(key, time.perf_counter())
@@ -150,10 +162,12 @@ class AgentOpsCallbackHandler(BaseCallbackHandler):
         )
 
     def on_chain_start(self, serialized: dict, inputs: dict, *, run_id: UUID, **kwargs: Any) -> None:
+        """Called when a chain starts execution."""
         self._ensure_run()
         self._span_starts[self._span_id(run_id)] = time.perf_counter()
 
     def on_chain_end(self, outputs: dict, *, run_id: UUID, **kwargs: Any) -> None:
+        """Called when a chain finishes execution. Records chain span."""
         run_uuid = self._ensure_run()
         key = self._span_id(run_id)
         start = self._span_starts.pop(key, None)
@@ -170,11 +184,13 @@ class AgentOpsCallbackHandler(BaseCallbackHandler):
         )
 
     def on_chain_error(self, error: BaseException, *, run_id: UUID, **kwargs: Any) -> None:
+        """Called when a chain encounters an error. Ends run with error status."""
         self._ensure_run()
         self.client.end_run(status="error", error=str(error))
         self.client.flush()
 
     def flush_run(self, status: str = "success") -> None:
+        """Finalize the run and flush all spans to AgentOps server."""
         latency_ms = None
         if self._run_start:
             latency_ms = (time.perf_counter() - self._run_start) * 1000
