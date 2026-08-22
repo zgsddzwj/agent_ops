@@ -110,6 +110,26 @@ class TestSecurity:
         hash2 = hash_api_key("ao_key2")
         assert hash1 != hash2
 
+    def test_verify_api_key_correct(self):
+        from app.core.security import generate_api_key, verify_api_key
+        key, key_hash, _ = generate_api_key()
+        assert verify_api_key(key, key_hash) is True
+
+    def test_verify_api_key_incorrect(self):
+        from app.core.security import generate_api_key, verify_api_key
+        _, key_hash, _ = generate_api_key()
+        assert verify_api_key("ao_wrongkey", key_hash) is False
+
+    def test_verify_api_key_constant_time(self):
+        """verify_api_key should use hmac.compare_digest, not string equality."""
+        from app.core.security import hash_api_key, verify_api_key
+        key = "ao_testconstant"
+        stored_hash = hash_api_key(key)
+        # Should return True for correct key
+        assert verify_api_key(key, stored_hash) is True
+        # Should return False for wrong key
+        assert verify_api_key("ao_different", stored_hash) is False
+
 
 # ─── Configuration tests ───
 
@@ -178,3 +198,45 @@ class TestSchemas:
         )
         assert r.rule_type == "cost_threshold"
         assert r.threshold == 100.0
+
+
+# ─── Additional configuration tests ───
+
+class TestAdvancedConfiguration:
+    """Tests for additional configuration fields."""
+
+    def test_log_requests_default(self):
+        from app.core.config import Settings
+        s = Settings()
+        assert s.log_requests is False
+
+    def test_api_timeout_default(self):
+        from app.core.config import Settings
+        s = Settings()
+        assert s.api_timeout == 30
+
+    def test_secret_key_default(self):
+        from app.core.config import Settings
+        s = Settings()
+        assert s.secret_key == "change-me-in-production"
+
+    def test_database_url_default(self):
+        from app.core.config import Settings
+        s = Settings()
+        assert s.database_url.startswith("postgresql+asyncpg://")
+
+    def test_redis_url_default(self):
+        from app.core.config import Settings
+        s = Settings()
+        assert s.redis_url.startswith("redis://")
+
+    def test_cors_origins_single(self):
+        from app.core.config import Settings
+        s = Settings(cors_origins="http://localhost:3000")
+        assert len(s.cors_origins_list) == 1
+        assert s.cors_origins_list[0] == "http://localhost:3000"
+
+    def test_cors_origins_empty(self):
+        from app.core.config import Settings
+        s = Settings(cors_origins="")
+        assert len(s.cors_origins_list) == 0
