@@ -1,8 +1,7 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from functools import lru_cache
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import MetricAggregate, Run
