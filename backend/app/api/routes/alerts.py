@@ -1,3 +1,5 @@
+"""Alert rule and event management API routes."""
+
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -17,7 +19,8 @@ async def create_alert_rule(
     body: AlertRuleCreate,
     project: Project = Depends(get_current_project),
     db: AsyncSession = Depends(get_db),
-):
+) -> AlertRule:
+    """Create a new alert rule for a project."""
     rule = AlertRule(
         project_id=project.id,
         name=body.name,
@@ -35,7 +38,8 @@ async def create_alert_rule(
 async def list_alert_rules(
     project: Project = Depends(get_current_project),
     db: AsyncSession = Depends(get_db),
-):
+) -> list[AlertRule]:
+    """List all alert rules for a project."""
     result = await db.execute(
         select(AlertRule).where(AlertRule.project_id == project.id)
     )
@@ -48,7 +52,8 @@ async def list_alert_events(
     db: AsyncSession = Depends(get_db),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-):
+) -> list[AlertEvent]:
+    """List alert events for a project, newest first."""
     result = await db.execute(
         select(AlertEvent)
         .where(AlertEvent.project_id == project.id)
@@ -64,7 +69,8 @@ async def acknowledge_event(
     event_id: uuid.UUID,
     project: Project = Depends(get_current_project),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict:
+    """Acknowledge an alert event."""
     result = await db.execute(
         select(AlertEvent).where(
             AlertEvent.id == event_id, AlertEvent.project_id == project.id
