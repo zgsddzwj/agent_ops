@@ -1,3 +1,5 @@
+"""Trace ingestion and run management API routes."""
+
 import uuid
 from datetime import datetime, timezone
 
@@ -21,7 +23,8 @@ async def ingest_traces(
     body: TraceIngestRequest,
     project: Project = Depends(get_current_project),
     db: AsyncSession = Depends(get_db),
-):
+) -> dict:
+    """Batch ingest trace spans for a project."""
     if len(body.spans) > MAX_SPANS_PER_INGEST:
         raise HTTPException(
             status_code=413,
@@ -70,7 +73,8 @@ async def create_run(
     body: RunCreate,
     project: Project = Depends(get_current_project),
     db: AsyncSession = Depends(get_db),
-):
+) -> Run:
+    """Create a new run."""
     run = Run(
         id=body.id or uuid.uuid4(),
         project_id=project.id,
@@ -91,7 +95,8 @@ async def update_run(
     body: RunUpdate,
     project: Project = Depends(get_current_project),
     db: AsyncSession = Depends(get_db),
-):
+) -> Run:
+    """Update an existing run."""
     result = await db.execute(
         select(Run).where(Run.id == run_id, Run.project_id == project.id)
     )
@@ -114,7 +119,8 @@ async def list_runs(
     status: str | None = None,
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-):
+) -> list[Run]:
+    """List runs for a project with optional status filter."""
     query = select(Run).where(Run.project_id == project.id)
     if status:
         query = query.where(Run.status == status)
@@ -128,7 +134,8 @@ async def get_run(
     run_id: uuid.UUID,
     project: Project = Depends(get_current_project),
     db: AsyncSession = Depends(get_db),
-):
+) -> Run:
+    """Get a single run by ID."""
     result = await db.execute(
         select(Run).where(Run.id == run_id, Run.project_id == project.id)
     )
@@ -143,7 +150,8 @@ async def get_run_spans(
     run_id: uuid.UUID,
     project: Project = Depends(get_current_project),
     db: AsyncSession = Depends(get_db),
-):
+) -> list[Span]:
+    """Get all spans for a specific run."""
     run_result = await db.execute(
         select(Run).where(Run.id == run_id, Run.project_id == project.id)
     )
