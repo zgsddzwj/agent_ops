@@ -1,3 +1,10 @@
+"""Alembic migration environment configuration.
+
+This module configures SQLAlchemy migrations for the AgentOps database.
+It supports both offline (SQL script generation) and online (direct DB)
+migration modes.
+"""
+
 from logging.config import fileConfig
 
 from alembic import context
@@ -16,6 +23,7 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
+    """Run migrations in offline mode (generate SQL scripts)."""
     url = config.get_main_option("sqlalchemy.url")
     context.configure(url=url, target_metadata=target_metadata, literal_binds=True)
     with context.begin_transaction():
@@ -23,6 +31,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
+    """Run migrations in online mode (direct database connection)."""
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
