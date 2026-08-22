@@ -3,8 +3,7 @@
 import logging
 import time
 import uuid
-from datetime import datetime
-from typing import Any
+from collections.abc import Callable
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
@@ -25,7 +24,7 @@ class ExceptionHandlerMiddleware:
     """
     
     async def __call__(
-        self, request: Request, call_next
+        self, request: Request, call_next: Callable
     ) -> Response | JSONResponse:
         request_id = str(uuid.uuid4())
         start_time = time.time()
@@ -39,7 +38,7 @@ class ExceptionHandlerMiddleware:
             # Log successful requests
             process_time = time.time() - start_time
             logger.info(
-                f"Request completed",
+                "Request completed",
                 extra={
                     "request_id": request_id,
                     "method": request.method,
@@ -164,7 +163,7 @@ class ExceptionHandlerMiddleware:
 
 async def log_request_response(
     request: Request,
-    call_next
+    call_next: Callable,
 ) -> Response:
     """Middleware to log request/response details for debugging.
     
