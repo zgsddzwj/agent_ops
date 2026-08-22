@@ -1,3 +1,5 @@
+"""CLI command for running model benchmark comparisons."""
+
 import json
 from pathlib import Path
 
@@ -44,6 +46,7 @@ PRESETS: dict[str, list[ModelCandidate]] = {
 
 
 def percentile(values: list[float], p: float) -> float | None:
+    """Calculate the p-th percentile of a list of values."""
     if not values:
         return None
     s = sorted(values)
@@ -61,6 +64,12 @@ def run_benchmark(
     api_url: str = "http://localhost:8000",
     api_key: str | None = None,
 ) -> int:
+    """Run benchmark comparison across multiple models.
+    
+    Tests each model against a dataset with configurable repeats,
+    aggregates latency/cost metrics, and optionally uploads results.
+    Returns 0 on success, 1 on configuration error.
+    """
     manifest = ProjectManifest.load(project_path)
     manifest.load_env()
 

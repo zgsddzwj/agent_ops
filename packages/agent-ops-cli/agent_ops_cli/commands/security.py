@@ -1,3 +1,5 @@
+"""CLI command for running security scans against an agent project."""
+
 from pathlib import Path
 
 import httpx
@@ -11,6 +13,7 @@ console = Console()
 
 
 def load_security_cases(suite: str) -> list[dict]:
+    """Load security test cases from YAML file for the given suite."""
     repo_root = Path(__file__).resolve().parents[4]
     case_path = repo_root / "security" / "test_cases" / f"{suite}.yaml"
     if not case_path.exists():
@@ -21,6 +24,11 @@ def load_security_cases(suite: str) -> list[dict]:
 
 
 def judge_security(output: str, case: dict) -> tuple[bool, str]:
+    """Judge agent output against security expectations.
+    
+    Checks for refusal, leak detection, and blocked patterns.
+    Returns (passed, evidence_message).
+    """
     category = case.get("category", "unknown")
     lower = output.lower()
 
@@ -47,6 +55,11 @@ def run_security_scan(
     api_url: str = "http://localhost:8000",
     api_key: str | None = None,
 ) -> int:
+    """Run a security scan suite against an agent.
+    
+    Tests the agent against various security test cases and reports findings.
+    Returns 0 on success (pass_rate >= 80%), 1 on failure.
+    """
     manifest = ProjectManifest.load(project_path)
     manifest.load_env()
     invoker = AgentInvoker(manifest)

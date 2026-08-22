@@ -1,3 +1,5 @@
+"""CLI command for running evaluation suites against an agent project."""
+
 import json
 from pathlib import Path
 
@@ -11,6 +13,7 @@ console = Console()
 
 
 def exact_match(output: str, expected: str | None) -> tuple[float, bool]:
+    """Check if expected string appears in output (case-insensitive)."""
     if not expected:
         return 1.0, True
     passed = expected.strip().lower() in output.strip().lower()
@@ -18,6 +21,7 @@ def exact_match(output: str, expected: str | None) -> tuple[float, bool]:
 
 
 def behavior_check(output: str, expected_behavior: str | None) -> tuple[float, bool]:
+    """Check if output matches expected behavior pattern (refuse/respond)."""
     if not expected_behavior:
         return 1.0, True
     lower = output.lower()
@@ -38,6 +42,10 @@ def run_eval(
     api_url: str = "http://localhost:8000",
     api_key: str | None = None,
 ) -> int:
+    """Run an evaluation suite and optionally upload results to the server.
+    
+    Returns 0 on success (pass_rate >= 80%), 1 on failure.
+    """
     manifest = ProjectManifest.load(project_path)
     manifest.load_env()
 
