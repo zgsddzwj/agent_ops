@@ -1,3 +1,6 @@
+"""Alert evaluation and metric aggregation services."""
+
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -7,9 +10,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AlertEvent, AlertRule, MetricAggregate, Run, SecurityScan
 
+logger = logging.getLogger(__name__)
+
 
 async def aggregate_metrics(db: AsyncSession, project_id: uuid.UUID | None = None) -> int:
-    """Hourly aggregation of run metrics."""
+    """Aggregate run metrics into hourly buckets.
+    
+    Args:
+        db: Async database session
+        project_id: Optional project filter. If None, aggregates all projects.
+    
+    Returns:
+        Number of aggregate records created.
+    """
     now = datetime.now(timezone.utc)
     bucket_start = now.replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)
     bucket_end = bucket_start + timedelta(hours=1)
@@ -94,7 +107,14 @@ def _percentile(values: list[float], p: float) -> float | None:
 
 
 async def evaluate_alert_rules(db: AsyncSession) -> list[AlertEvent]:
-    """Check enabled alert rules and fire events."""
+    """Check all enabled alert rules and fire events for triggered thresholds.
+    
+    Evaluates cost, latency, error rate, and security pass rate rules.
+    Sends webhook notifications if configured.
+    
+    Returns:
+        List of AlertEvent objects created.
+    """
     result = await db.execute(select(AlertRule).where(AlertRule.enabled == True))  # noqa: E712
     rules = result.scalars().all()
     events: list[AlertEvent] = []
@@ -173,8 +193,8 @@ async def evaluate_alert_rules(db: AsyncSession) -> list[AlertEvent]:
                             rule.webhook_url,
                             json={"message": message, "value": value, "rule": rule.name},
                         )
-                except Exception:
-                    pass
+                except Exception as webhook_err:
+                    logger.warning(f"Webhook delivery failed for rule {rule.name}: {webhook_err}")
 
     await db.flush()
     return events
