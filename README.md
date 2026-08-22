@@ -315,6 +315,68 @@ SDK 采集字段：`latency_ms`、`ttft_ms`（streaming）、`tokens_in/out`、`
 
 ## 📋 优化记录
 
+### v0.2.0 代码质量优化汇总 (2026-08-22)
+
+#### 1. middleware.py 清理
+- 移除未使用导入 `datetime`、`Any`
+- 添加 `Callable` 类型注解到中间件函数
+- 修复 f-string 无格式化占位符
+
+#### 2. Alembic 迁移配置
+- 添加模块 docstring 说明迁移配置
+- 添加 `run_migrations_offline`/`online` 函数 docstring
+
+#### 3. API 认证安全加固
+- `deps.py` 使用 `verify_api_key` 时序安全比较防止 timing 攻击
+- `get_optional_project` 也添加 verify 校验
+- 添加模块和函数 docstring
+
+#### 4-6. API 路由代码规范化
+- `traces.py`、`evals.py`、`alerts.py` 添加模块 docstring
+- 所有路由函数添加返回类型注解和 docstring
+- 统一代码风格
+
+#### 7-8. 服务层清理
+- `metrics.py` 移除未使用导入 `lru_cache`、`func`
+- `ingest.py` 移除未使用导入 `func`
+
+#### 9. 告警服务层增强
+- 添加模块 docstring 和 logging
+- Webhook 失败添加 warning 日志，不再静默吞异常
+- 增强 `aggregate_metrics`/`evaluate_alert_rules` docstring
+
+#### 10. Worker tasks 文档化
+- 添加模块 docstring 说明后台任务用途
+- `_create_session_factory` 添加泛型类型注解
+- `WorkerSettings` 添加 docstring
+
+#### 11. SDK callback handler 文档化
+- 添加模块 docstring 说明 LangChain 回调用途
+- 所有回调方法添加 docstring（11个方法）
+
+#### 12. CLI commands 文档化
+- `eval.py`、`benchmark.py`、`security.py` 添加模块 docstring
+- 所有公开函数添加 docstring
+
+#### 13. 前端 TypeScript 类型完善
+- 添加 `Project`/`MetricsSummary`/`Run`/`Span`/`EvalRun`/`Benchmark`/`SecurityScan`/`AlertRule`/`AlertEvent` 接口定义
+- 所有 `useQuery`/`useMutation` 添加泛型类型参数
+- 替换 `any[]` 为明确类型
+
+#### 14. 测试用例补充
+- 添加 `verify_api_key` 正确/错误/时序安全测试
+- 添加 `TestAdvancedConfiguration` 测试类（7个配置测试）
+
+#### 15. 依赖管理和工具链配置
+- 锁定所有 dev-dependencies 版本上下界
+- 添加 `bandit`/`safety` 安全扫描依赖
+- 添加 Ruff 配置（line-length=120, lint 规则, isort）
+- 添加 pytest 配置（asyncio_mode, testpaths）
+- 添加 coverage 配置（60% 阈值）
+
+#### 16. README 更新
+- 记录全部 16 次优化内容
+
 ### v0.1.0 优化汇总 (2026-06-18)
 
 #### 配置文件完善 (#10, #11)
