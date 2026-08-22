@@ -30,10 +30,35 @@ members = [
 
 [tool.uv]
 dev-dependencies = [
-    "pytest>=8.0",
-    "pytest-asyncio>=0.23",
-    "pytest-cov>=5.0",
-    "httpx>=0.27",
-    "ruff>=0.4",
-    "pre-commit>=3.7",
+    "pytest>=8.0,<9.0",
+    "pytest-asyncio>=0.23,<0.25",
+    "pytest-cov>=5.0,<6.0",
+    "httpx>=0.27,<0.29",
+    "ruff>=0.4,<0.7",
+    "pre-commit>=3.7,<4.0",
+    "bandit>=1.7,<2.0",
+    "safety>=3.0,<4.0",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "B", "C4", "UP"]
+ignore = ["E501", "B008"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "agent_ops", "agent_ops_cli", "worker"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto",
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["app", "agent_ops", "agent_ops_cli", "worker"]
+omit = ["*/tests/*", "*/alembic/*"]
+
+[tool.coverage.report]
+fail_under = 60
+show_missing = true
