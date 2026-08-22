@@ -1,3 +1,5 @@
+"""Evaluation run management API routes."""
+
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -18,7 +20,8 @@ async def create_eval_run(
     body: EvalRunCreate,
     project: Project = Depends(get_current_project),
     db: AsyncSession = Depends(get_db),
-):
+) -> EvalRun:
+    """Create a new evaluation run and enqueue worker task."""
     eval_run = EvalRun(
         project_id=project.id,
         dataset_id=body.dataset_id,
@@ -46,7 +49,8 @@ async def list_eval_runs(
     db: AsyncSession = Depends(get_db),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-):
+) -> list[EvalRun]:
+    """List evaluation runs for a project."""
     result = await db.execute(
         select(EvalRun)
         .where(EvalRun.project_id == project.id)
@@ -62,7 +66,8 @@ async def get_eval_run(
     run_id: uuid.UUID,
     project: Project = Depends(get_current_project),
     db: AsyncSession = Depends(get_db),
-):
+) -> EvalRun:
+    """Get a single eval run by ID."""
     result = await db.execute(
         select(EvalRun).where(EvalRun.id == run_id, EvalRun.project_id == project.id)
     )
@@ -77,7 +82,8 @@ async def get_eval_results(
     run_id: uuid.UUID,
     project: Project = Depends(get_current_project),
     db: AsyncSession = Depends(get_db),
-):
+) -> list[EvalResult]:
+    """Get all results for a specific eval run."""
     run_result = await db.execute(
         select(EvalRun).where(EvalRun.id == run_id, EvalRun.project_id == project.id)
     )
