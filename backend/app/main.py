@@ -2,6 +2,7 @@
 
 import logging
 import time
+from collections.abc import Callable
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -19,7 +20,7 @@ from app.core.middleware import ExceptionHandlerMiddleware
 from app.services.ingest import seed_model_pricing
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG if settings.debug else logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
@@ -27,8 +28,24 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan with structured startup/shutdown."""
+    """Application lifespan with structured startup/shutdown.
+    
+    Startup:
+    - Initialize database tables
+    - Seed model pricing data
+    - Log configuration summary
+    
+    Shutdown:
+    - Dispose database engine
+    """
     logger.info("Starting up AgentOps API...")
+    logger.info(
+        "Configuration: debug=%s, rate_limit=%s, log_requests=%s, api_timeout=%ss",
+        settings.debug,
+        settings.rate_limit_enabled,
+        settings.log_requests,
+        settings.api_timeout,
+    )
     try:
         await init_database()
         async with async_session() as db:
@@ -37,7 +54,7 @@ async def lifespan(app: FastAPI):
         logger.info("AgentOps API startup completed successfully")
         yield
     except Exception as e:
-        logger.error(f"Error during startup: {e}")
+        logger.error(f"Error during startup: {e}", exc_info=True)
         raise
     finally:
         logger.info("Shutting down AgentOps API...")
@@ -80,7 +97,7 @@ _exception_handler = ExceptionHandlerMiddleware()
 
 
 @app.middleware("http")
-async def exception_middleware(request: Request, call_next):
+async def exception_middleware(request: Request, call_next: Callable) -> JSONResponse | Response:
     """Global exception handler middleware (singleton instance)."""
     return await _exception_handler(request, call_next)
 
@@ -92,8 +109,12 @@ _RATE_LIMIT_MAX_IPS = 10_000  # Prevent unbounded memory growth
 
 
 @app.middleware("http")
-async def rate_limit_middleware(request: Request, call_next):
-    """Rate limiting middleware using in-memory sliding window."""
+async def rate_limit_middleware(request: Request, call_next: Callable) -> JSONResponse | Response:
+    """Rate limiting middleware using in-memory sliding window.
+    
+    Limits requests per client IP within a configurable time window.
+    Skips health check endpoint to ensure monitoring probes always succeed.
+    """
     if not settings.rate_limit_enabled:
         return await call_next(request)
 
@@ -175,4 +196,6 @@ async def health():
         health_status["redis"] = "disconnected"
 
     health_status["response_time_ms"] = round((time.time() - start_time) * 1000, 2)
+    if health_status["status"] != "ok":
+        logger.warning(f"Health check degraded: db={health_status.get('database')}, redis={health_status.get('redis')}")
     return health_status
