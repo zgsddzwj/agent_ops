@@ -1,8 +1,13 @@
 """Application configuration loaded from environment variables."""
 
+import logging
+import warnings
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -41,6 +46,51 @@ class Settings(BaseSettings):
         extra="ignore",
         case_sensitive=False,
     )
+
+    @field_validator("secret_key")
+    @classmethod
+    def validate_secret_key(cls, v: str) -> str:
+        """Warn if the default secret key is used in a non-debug environment."""
+        if v == "change-me-in-production":
+            warnings.warn(
+                "Using default secret_key. Set SECRET_KEY environment variable "
+                "to a secure random value for production deployment.",
+                stacklevel=2,
+            )
+            logger.warning("Default secret_key is in use - not safe for production!")
+        return v
+
+    @field_validator("api_port")
+    @classmethod
+    def validate_api_port(cls, v: int) -> int:
+        """Validate that the API port is within the valid range."""
+        if not (1 <= v <= 65535):
+            raise ValueError(f"api_port must be between 1 and 65535, got {v}")
+        return v
+
+    @field_validator("rate_limit_requests")
+    @classmethod
+    def validate_rate_limit_requests(cls, v: int) -> int:
+        """Validate that rate_limit_requests is a positive integer."""
+        if v <= 0:
+            raise ValueError(f"rate_limit_requests must be positive, got {v}")
+        return v
+
+    @field_validator("rate_limit_window")
+    @classmethod
+    def validate_rate_limit_window(cls, v: int) -> int:
+        """Validate that rate_limit_window is a positive integer."""
+        if v <= 0:
+            raise ValueError(f"rate_limit_window must be positive, got {v}")
+        return v
+
+    @field_validator("api_timeout")
+    @classmethod
+    def validate_api_timeout(cls, v: int) -> int:
+        """Validate that api_timeout is a positive integer."""
+        if v <= 0:
+            raise ValueError(f"api_timeout must be positive, got {v}")
+        return v
 
     @property
     def cors_origins_list(self) -> list[str]:
