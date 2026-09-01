@@ -15,6 +15,44 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 
+def _build_error_response(
+    request: Request,
+    request_id: str,
+    start_time: float,
+    *,
+    status_code: int,
+    error: str,
+    detail: str,
+    error_type: str,
+    log_message: str | None = None,
+    log_level: int = logging.ERROR,
+    exc_info: bool = False,
+) -> JSONResponse:
+    """Log an error with request context and build a consistent JSON error response."""
+    process_time = time.time() - start_time
+    logger.log(
+        log_level,
+        log_message or error,
+        extra={
+            "request_id": request_id,
+            "method": request.method,
+            "url": str(request.url),
+            "error": detail,
+            "error_type": error_type,
+            "process_time_ms": round(process_time * 1000, 2),
+        },
+        exc_info=exc_info,
+    )
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "error": error,
+            "detail": detail,
+            "request_id": request_id,
+        }
+    )
+
+
 class ExceptionHandlerMiddleware:
     """Global exception handler middleware for FastAPI applications.
     
@@ -54,110 +92,52 @@ class ExceptionHandlerMiddleware:
             
         except SQLAlchemyError as e:
             # Database-related errors
-            process_time = time.time() - start_time
-            
-            logger.error(
-                "Database error occurred",
-                extra={
-                    "request_id": request_id,
-                    "method": request.method,
-                    "url": str(request.url),
-                    "error": str(e),
-                    "error_type": "database",
-                    "process_time_ms": round(process_time * 1000, 2),
-                },
-                exc_info=True
-            )
-            
-            return JSONResponse(
+            return _build_error_response(
+                request, request_id, start_time,
                 status_code=500,
-                content={
-                    "error": "Internal server error",
-                    "detail": "A database error occurred",
-                    "request_id": request_id,
-                }
+                error="Internal server error",
+                detail="A database error occurred",
+                error_type="database",
+                log_message="Database error occurred",
+                exc_info=True,
             )
-            
+
         except httpx.RequestError as e:
             # External service connection errors
-            process_time = time.time() - start_time
-            
-            logger.error(
-                "External service error",
-                extra={
-                    "request_id": request_id,
-                    "method": request.method,
-                    "url": str(request.url),
-                    "error": str(e),
-                    "error_type": "external_service",
-                    "process_time_ms": round(process_time * 1000, 2),
-                },
-                exc_info=True
-            )
-            
-            return JSONResponse(
+            return _build_error_response(
+                request, request_id, start_time,
                 status_code=502,
-                content={
-                    "error": "Bad gateway",
-                    "detail": "External service unavailable",
-                    "request_id": request_id,
-                }
+                error="Bad gateway",
+                detail="External service unavailable",
+                error_type="external_service",
+                log_message="External service error",
+                exc_info=True,
             )
-            
+
         except ValueError as e:
             # Input validation errors
-            process_time = time.time() - start_time
-            
-            logger.warning(
-                "Validation error",
-                extra={
-                    "request_id": request_id,
-                    "method": request.method,
-                    "url": str(request.url),
-                    "error": str(e),
-                    "error_type": "validation",
-                    "process_time_ms": round(process_time * 1000, 2),
-                }
-            )
-            
-            return JSONResponse(
+            return _build_error_response(
+                request, request_id, start_time,
                 status_code=400,
-                content={
-                    "error": "Bad request",
-                    "detail": str(e),
-                    "request_id": request_id,
-                }
+                error="Bad request",
+                detail=str(e),
+                error_type="validation",
+                log_message="Validation error",
+                log_level=logging.WARNING,
             )
-            
+
         except Exception as e:
             # Catch-all for any other unhandled exceptions
-            process_time = time.time() - start_time
-            
-            logger.exception(
-                "Unhandled exception occurred",
-                extra={
-                    "request_id": request_id,
-                    "method": request.method,
-                    "url": str(request.url),
-                    "error": str(e),
-                    "error_type": "unhandled",
-                    "process_time_ms": round(process_time * 1000, 2),
-                }
-            )
-            
             # In production, don't expose internal error details
-            if settings.debug:
-                detail = str(e)
-            else:
-                detail = "An internal error occurred"
-            
-            return JSONResponse(
+            detail = str(e) if settings.debug else "An internal error occurred"
+            return _build_error_response(
+                request, request_id, start_time,
                 status_code=500,
-                content={
-                    "error": "Internal server error",
-                    "detail": detail,
-                    "request_id": request_id,
-                }
+                error="Internal server error",
+                detail=detail,
+                error_type="unhandled",
+                log_message="Unhandled exception occurred",
+                exc_info=True,
             )
 
 
