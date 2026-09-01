@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AlertEvent, AlertRule, MetricAggregate, Run, SecurityScan
+from app.services.ingest import percentile
 
 logger = logging.getLogger(__name__)
 
@@ -55,10 +56,10 @@ async def aggregate_metrics(db: AsyncSession, project_id: uuid.UUID | None = Non
             total_cost_usd=sum(r.cost_usd or 0 for r in project_runs),
             total_tokens=sum(r.total_tokens or 0 for r in project_runs),
             avg_latency_ms=sum(latencies) / len(latencies) if latencies else None,
-            p50_latency_ms=_percentile(latencies, 50),
-            p95_latency_ms=_percentile(latencies, 95),
-            p50_ttft_ms=_percentile(ttfts, 50),
-            p95_ttft_ms=_percentile(ttfts, 95),
+            p50_latency_ms=percentile(latencies, 50),
+            p95_latency_ms=percentile(latencies, 95),
+            p50_ttft_ms=percentile(ttfts, 50),
+            p95_ttft_ms=percentile(ttfts, 95),
         )
         db.add(agg)
         count += 1
@@ -86,24 +87,16 @@ async def aggregate_metrics(db: AsyncSession, project_id: uuid.UUID | None = Non
                     total_cost_usd=sum(r.cost_usd or 0 for r in model_runs),
                     total_tokens=sum(r.total_tokens or 0 for r in model_runs),
                     avg_latency_ms=sum(m_latencies) / len(m_latencies) if m_latencies else None,
-                    p50_latency_ms=_percentile(m_latencies, 50),
-                    p95_latency_ms=_percentile(m_latencies, 95),
-                    p50_ttft_ms=_percentile(m_ttfts, 50),
-                    p95_ttft_ms=_percentile(m_ttfts, 95),
+                    p50_latency_ms=percentile(m_latencies, 50),
+                    p95_latency_ms=percentile(m_latencies, 95),
+                    p50_ttft_ms=percentile(m_ttfts, 50),
+                    p95_ttft_ms=percentile(m_ttfts, 95),
                 )
             )
             count += 1
 
     await db.flush()
     return count
-
-
-def _percentile(values: list[float], p: float) -> float | None:
-    if not values:
-        return None
-    sorted_vals = sorted(values)
-    idx = min(int(len(sorted_vals) * p / 100), len(sorted_vals) - 1)
-    return sorted_vals[idx]
 
 
 async def evaluate_alert_rules(db: AsyncSession) -> list[AlertEvent]:
@@ -145,7 +138,7 @@ async def evaluate_alert_rules(db: AsyncSession) -> list[AlertEvent]:
                 )
             )
             latencies = [r for r in runs_result.scalars().all()]
-            value = _percentile(latencies, 95) or 0.0
+            value = percentile(latencies, 95) or 0.0
             if value > rule.threshold:
                 triggered = True
                 message = f"P95 latency {value:.0f}ms exceeded threshold {rule.threshold:.0f}ms"
