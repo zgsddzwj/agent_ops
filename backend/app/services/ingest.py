@@ -23,13 +23,10 @@ DEFAULT_PRICING = [
 
 
 async def seed_model_pricing(db: AsyncSession) -> None:
+    existing = await db.execute(select(ModelPricing.provider, ModelPricing.model))
+    existing_keys = set(existing.all())
     for provider, model, inp, out in DEFAULT_PRICING:
-        existing = await db.execute(
-            select(ModelPricing).where(
-                ModelPricing.provider == provider, ModelPricing.model == model
-            )
-        )
-        if existing.scalar_one_or_none() is None:
+        if (provider, model) not in existing_keys:
             db.add(
                 ModelPricing(
                     provider=provider,
